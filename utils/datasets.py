@@ -1,3 +1,4 @@
+import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
@@ -43,3 +44,39 @@ class SpamDataset(Dataset):
             if encoded_length > max_length:
                 max_length = encoded_length
         return max_length
+
+
+def create_balanced_dataset(df: pd.DataFrame, target: str):
+    """
+    创建样本均衡的df
+
+    """
+    num_labels = []  # 统计各个label对应的数量
+    for label in df[target].unique():
+        num_labels.append(df[df[target]==label].shape[0])
+    
+    min_num = min(num_labels)
+    # 从每类label中抽取min_num个样本
+    df_subsets = []
+    for label in df[target].unique():
+        subset = df[df[target]==label].sample(min_num)
+        df_subsets.append(subset)
+        
+    balanced_df = pd.concat(df_subsets, axis=0)
+    return balanced_df
+
+
+def random_split(df, train_frac, validation_frac):
+    # Shuffle the entire DataFrame
+    df = df.sample(frac=1, random_state=123).reset_index(drop=True)
+
+    # Calculate split indices
+    train_end = int(len(df) * train_frac)
+    validation_end = train_end + int(len(df) * validation_frac)
+
+    # Split the DataFrame
+    train_df = df[:train_end]
+    validation_df = df[train_end:validation_end]
+    test_df = df[validation_end:]
+
+    return train_df, validation_df, test_df

@@ -3,6 +3,7 @@ import sys
 
 sys.path.append(os.getcwd())
 
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 import pandas as pd
@@ -25,6 +26,7 @@ from utils.text_generation import (
     generate_text_simple,
 )
 from utils.evaluation import calc_accuracy_loader, calc_loss_batch, calc_loss_loader
+from utils.plot import plot_values
 
 
 # 设置随机种子
@@ -67,7 +69,16 @@ def random_split(df, train_frac, validation_frac):
     return train_df, validation_df, test_df
 
 
-def train(model, train_loader, val_loader, optimizer, device, num_epochs, eval_freq):
+def train(
+    model,
+    train_loader,
+    val_loader,
+    optimizer,
+    device,
+    num_epochs,
+    eval_freq,
+    eval_num_batches,
+):
     # Initialize lists to track losses and examples seen
     model.to(device)
     train_losses, val_losses, train_accs, val_accs = [], [], [], []
@@ -85,79 +96,39 @@ def train(model, train_loader, val_loader, optimizer, device, num_epochs, eval_f
             examples_seen += input_batch.shape[0]
             global_step += 1
 
-            # if global_step % eval_freq == 0:
-            #     train_loss, val_loss = evaluate_model(
-            #         model, train_loader, val_loader, device
-            #     )
-            #     train_losses.append(train_loss)
-            #     val_losses.append(val_loss)
+            if global_step % eval_freq == 0:
+                train_loss, val_loss = evaluate_model(
+                    model,
+                    train_loader,
+                    val_loader,
+                    device,
+                    num_batches=eval_num_batches,
+                )
+                train_losses.append(train_loss)
+                val_losses.append(val_loss)
 
         # 每训练完一个epoch记录结果
-        train_loss, val_loss = evaluate_model(
-                    model, train_loader, val_loader, device
-                )
         train_accuracy = calc_accuracy_loader(train_loader, model, device)
         val_accuracy = calc_accuracy_loader(val_loader, model, device)
         print(f"Epoch {epoch + 1}:", end="")
-        print(f"Training accuracy: {train_accuracy*100:.2f}% with training loss {train_loss:.2f} | ", end="")
-        print(f"Validation accuracy: {val_accuracy*100:.2f}% with validation loss {val_loss:.2f}")
+        print(
+            f"Training accuracy: {train_accuracy*100:.2f}% with training loss {train_loss:.2f} | ",
+            end="",
+        )
+        print(
+            f"Validation accuracy: {val_accuracy*100:.2f}% with validation loss {val_loss:.2f}"
+        )
         train_accs.append(train_accuracy)
         val_accs.append(val_accuracy)
 
     return train_losses, val_losses, train_accs, val_accs, examples_seen
 
 
-# def train(
-#     model, train_loader, val_loader, optimizer, device, num_epochs, eval_freq, eval_iter
-# ):
-#     # Initialize lists to track losses and examples seen
-#     model.to(device)
-#     train_losses, val_losses, train_accs, val_accs = [], [], [], []
-#     examples_seen, global_step = 0, -1
-
-#     # Main training loop
-#     p_bar = tqdm(range(num_epochs), total=num_epochs, desc="Num of epoch")
-#     for epoch in p_bar:
-#         model.train()  # Set model to training mode
-
-#         epoch_p_bar = tqdm(train_loader, desc=f"Epoch {epoch}")
-#         for input_batch, target_batch in epoch_p_bar:
-#             optimizer.zero_grad()  # Reset loss gradients from previous batch iteration
-#             loss = calc_loss_batch(input_batch, target_batch, model, device)
-#             loss.backward()  # Calculate loss gradients
-#             optimizer.step()  # Update model weights using loss gradients
-#             examples_seen += input_batch.shape[0]  # New: track examples instead of tokens
-#             global_step += 1
-
-#             # Optional evaluation step
-#             if global_step % eval_freq == 0:
-#                 train_loss, val_loss = evaluate_model(
-#                     model, train_loader, val_loader, device, eval_iter
-#                 )
-#                 train_losses.append(train_loss)
-#                 val_losses.append(val_loss)
-
-#         # Calculate accuracy after each epoch
-#         train_accuracy = calc_accuracy_loader(
-#             train_loader, model, device
-#         )
-#         val_accuracy = calc_accuracy_loader(
-#             val_loader, model, device
-#         )
-#         print(f"Epoch {epoch+1}:", end="")
-#         print(f"Training accuracy: {train_accuracy*100:.2f}% | ", end="")
-#         print(f"Validation accuracy: {val_accuracy*100:.2f}%")
-#         train_accs.append(train_accuracy)
-#         val_accs.append(val_accuracy)
-
-#     return train_losses, val_losses, train_accs, val_accs, examples_seen
-
-
-def evaluate_model(model, train_loader, val_loader, device, eval_iter=None):
+def evaluate_model(model, train_loader, val_loader, device, num_batches=None):
     model.eval()
     with torch.no_grad():
-        train_loss = calc_loss_loader(train_loader, model, device, num_batches=eval_iter)
-        val_loss = calc_loss_loader(val_loader, model, device, num_batches=eval_iter)
+        train_loss = calc_loss_loader(train_loader, model, device, num_batches)
+        val_loss = calc_loss_loader(val_loader, model, device, num_batches)
     model.train()
     return train_loss, val_loss
 
@@ -289,12 +260,53 @@ def main():
     device = torch.device("cpu")
 
     train_losses, val_losses, train_accs, val_accs, examples_seen = train(
-        model, train_loader, val_loader, optimizer, device, num_epochs, eval_freq
+        model, train_loader, val_loader, optimizer, device, num_epochs, eval_freq, eval_num_batches=10
     )
 
     end_time = time.time()
     execution_time_minutes = (end_time - start_time) / 60
     print(f"Training completed in {execution_time_minutes:.2f} minutes.")
+
+    # 绘制结果
+    epochs_arr = np.linspace(0, num_epochs, len(train_losses))
+    examples_seen_arr = np.linspace(0, examples_seen, len(train_losses))
+    # 绘制loss
+    plot_values(
+        epochs_seen=epochs_arr,
+        examples_seen=examples_seen_arr,
+        train_values=train_losses,
+        val_values=val_losses,
+        label="loss",
+    )
+    # 绘制accuracy
+    epochs_arr = np.linspace(0, num_epochs, len(train_accs))
+    examples_seen_arr = np.linspace(0, examples_seen, len(train_accs))
+    plot_values(
+        epochs_seen=epochs_arr,
+        examples_seen=examples_seen_arr,
+        train_values=train_accs,
+        val_values=val_accs,
+        label="accuracy",
+    )
+    
+    # 模型保存
+    save_path = "/Users/kingsun/Desktop/LLM/projects/my-projects/LLMs-from-srcatch-learning/data/models/gpt2/124M/review_classifier.pth"
+    model.save(save_path)
+    
+    # # 尝试重新导入模型
+    # model = GPTModel(BASE_CONFIG)
+    # model.load(save_path, device)
+    # print("Model has been reloaded successfully")
+    
+    # 检验模型性能
+    print("Model performence testing: ")
+    train_accuracy = calc_accuracy_loader(train_loader, model, device)
+    val_accuracy = calc_accuracy_loader(val_loader, model, device)
+    test_accuracy = calc_accuracy_loader(test_loader, model, device)
+
+    print(f"Training accuracy: {train_accuracy*100:.2f}%")
+    print(f"Validation accuracy: {val_accuracy*100:.2f}%")
+    print(f"Test accuracy: {test_accuracy*100:.2f}%")
 
 
 if __name__ == "__main__":
