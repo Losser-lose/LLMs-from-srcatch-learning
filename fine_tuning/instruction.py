@@ -405,7 +405,7 @@ def main():
             context_size=BASE_CONFIG["context_length"],
             eos_id=50256,
         )
-        generate_text = token_ids_to_text(token_ids)
+        generate_text = token_ids_to_text(token_ids, tokenizer)
         response_text = (
             generate_text[len(input_text) :]
             .replace("### Response:", "")
@@ -416,7 +416,7 @@ def main():
 
     test_data_path = os.path.abspath(
         os.path.join(
-            os.getcwd(), "./data/instruction-data-with-response-standalone.json"
+            os.getcwd(), "./data/instruction-data-with-response.json"
         )
     )
     with open(test_data_path, "w") as file:
@@ -428,7 +428,7 @@ def main():
         os.path.join(
             os.getcwd(),
             "./data/models/"
-            + f"{re.sub(r'[ ()]', '', CHOOSE_MODEL)}-sft-standalone.pth",
+            + f"{re.sub(r'[ ()]', '', CHOOSE_MODEL)}-sft.pth",
         )
     )
     torch.save(model.state_dict(), file_name)
