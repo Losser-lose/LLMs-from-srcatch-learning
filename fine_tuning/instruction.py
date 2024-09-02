@@ -70,16 +70,16 @@ def format_input(entry):
         f"\n\n### Instruction:\n{entry['instruction']}"
     )
 
-    input_text = f"\n\n### Input:\n{entry['input']}" if entry["input"] else ""
+    input_text = f"\n\n### Input:\n{entry['input']}" if entry['input'] else ""
 
     return instruction_text + input_text
     
     
 def format_result(entry):
-    instruction_text = f"### Instruction: \n{entry["instruction"]}"
-    input_text = f"\n\n### Input: \n{entry["input"]}" if entry['input'] else ""
-    output_text = f"\n\n### Input: \n{entry["output"]}" if entry["output"] else ""
-    response_text = f"\n\n### Input: \n{entry["model_response"]}" if entry["model_response"] else ""
+    instruction_text = f"### Instruction: \n{entry['instruction']}"
+    input_text = f"\n\n### Input: \n{entry['input']}" if entry['input'] else ""
+    output_text = f"\n\n### Input: \n{entry['output']}" if entry['output'] else ""
+    response_text = f"\n\n### Input: \n{entry['model_response']}" if entry['model_response'] else ""
     
     return instruction_text + input_text + output_text + response_text
  
